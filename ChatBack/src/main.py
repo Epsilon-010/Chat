@@ -1,71 +1,59 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from src.websocket import manager
-from src.auth import (
-    ALLOWED_USERS, sha256,
-    generate_private_key, generate_public_key, compute_shared_key
-)
-from src.crypto_utils import encrypt_message, decrypt_message, derive_key
+from fastapi.middleware.cors import CORSMiddleware
+from src.websocket import manager 
+from src.crypto_utils import generate_server_keys, compute_shared_secret, derive_aes_key
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI()
 
-clients_keys = {}  # websocket → AES key
-clients_allowed = {}  # websocket → bool
-
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
+async def websocket_endpoint(websocket: WebSocket, username: str):
+    await manager.connect(websocket, username)
 
-    # Paso 1: recibir username y valor DH del cliente
-    query = websocket.query_params
-    username = query.get("username")
-    client_public = int(query.get("pub", "0"))
+    # El servidor genera su par Diffie‐Hellman
+    B, server_priv = generate_server_keys()
+    uname = username.lower()
 
-    # Paso 2: Generar clave DH del servidor
-    server_private = generate_private_key()
-    server_public = generate_public_key(server_private)
+    # Guardamos la clave privada temporal del servidor
+    manager.server_private[uname] = server_priv
 
-    # Enviar al cliente el public key del servidor
-    await websocket.send_json({"server_pub": server_public})
-
-    # Paso 3: Calcular clave compartida
-    shared_secret = compute_shared_key(client_public, server_private)
-    key = derive_key(shared_secret)
-    clients_keys[websocket] = key
-
-    # Verificar si usuario es permitido
-    clients_allowed[websocket] = username in ALLOWED_USERS
-
-    await manager.connect(websocket)
+    # Enviamos B al cliente
+    await manager.send_json(websocket, {
+        "type": "server_pub",
+        "value": B
+    })
 
     try:
-        # Mensaje de inicio
-        await manager.broadcast(f"🔵 {username} se unió", websocket)
-
         while True:
-            ciphertext = await websocket.receive_text()
-            key = clients_keys[websocket]
-            allowed = clients_allowed[websocket]
+            data = await websocket.receive_json()
 
-            if allowed:
-                # Usuario permitido envía texto en claro cifrado → Servidor descifra
-                plaintext = decrypt_message(key, ciphertext)
-            else:
-                # Usuario no permitido → NO DESCIFRAMOS
-                plaintext = f"[ENCRYPTED]{ciphertext}"
+            if data["type"] == "client_pub":
+                Apub = int(data["value"])  # clave pública del cliente
 
-            # Ahora enviamos a cada cliente según su tipo
-            for ws in manager.active_connections:
-                dest_key = clients_keys[ws]
-                dest_allowed = clients_allowed[ws]
+                # Cálculo del secreto compartido
+                priv = manager.server_private[uname]
+                shared = compute_shared_secret(priv, Apub) 
 
-                if dest_allowed:
-                    # Destinatario permitido → recibe en claro
-                    await ws.send_text(f"{username}: {plaintext}")
-                else:
-                    # Destinatario NO permitido → ciframos
-                    encrypted = encrypt_message(dest_key, plaintext)
-                    await ws.send_text(encrypted)
+                # Derivar la clave AES y almacenarla
+                aes_key = derive_aes_key(shared)
+                manager.aes_keys[uname] = aes_key
+
+                # Enviar permisos al cliente
+                allowed = manager.allowed_users.get(uname, False)
+                await manager.send_json(websocket, {
+                    "type": "perm",
+                    "allowed": allowed
+                })
+
+            elif data["type"] == "msg":
+                message_text = data.get("msg", "")
+                # Difundir mensaje a todos
+                await manager.broadcast(username, message_text)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-        await manager.broadcast(f"🔴 {username} salió", websocket)
+    except Exception as e:
+        logging.error(f"Error en WebSocket: {e}")
+        manager.disconnect(websocket)

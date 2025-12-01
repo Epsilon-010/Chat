@@ -1,16 +1,6 @@
 import hashlib
 import secrets
 
-# Equipo (permitidos)
-ALLOWED_USERS = {
-    "ray": "SHA256_HASH_DE_RAY",
-    "angel": "SHA256_HASH_DE_ANGEL",
-    "agustin": "SHA256_HASH_DE_AGUSTIN",
-    "camila": "SHA256_HASH_DE_CAMILA",
-    "emiliano": "SHA256_HASH_DE_EMILIANO",
-    "chuy": "SHA256_HASH_DE_CHUY"
-}
-
 # HASH SHA-256
 def sha256(text: str):
     return hashlib.sha256(text.encode()).hexdigest()
