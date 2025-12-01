@@ -17,28 +17,30 @@ const MessageList = ({ msg }: Props) => {
   }
 
   return (
+  <div
+    className={`flex mb-3 ${
+      isSelf ? "justify-end" : "justify-start"
+    } transition-all`}
+  >
     <div
-      className={`flex mb-2 ${
-        isSelf ? "justify-end" : "justify-start"
-      } transition-all`}
+      className={`p-3 rounded-2xl max-w-xs shadow-lg border
+      ${
+        isSelf
+          ? "bg-gradient-to-br from-amber-400 to-amber-300 text-black border-amber-200"
+          : "bg-gray-700/90 text-white border-gray-600"
+      }`}
     >
-      <div
-        className={`p-3 rounded-2xl max-w-xs shadow-md ${
-          isSelf
-            ? "bg-linear-to-r from-amber-400 to-amber-300 text-black"
-            : "bg-gray-700 text-white"
-        }`}
-      >
-        {!isSelf && (
-          <p className="text-xs font-semibold text-gray-300 mb-1">
-            {msg.sender_name}
-          </p>
-        )}
-        <p className="text-sm">{msg.content}</p>
-        <p className="text-xs text-gray-400 mt-1 text-right">{msg.create_at}</p>
-      </div>
+      {!isSelf && (
+        <p className="text-xs font-semibold text-gray-300 mb-1">
+          {msg.sender_name}
+        </p>
+      )}
+      <p className="text-sm leading-relaxed">{msg.content}</p>
+      <p className="text-xs text-gray-400 mt-1 text-right">{msg.create_at}</p>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default MessageList;

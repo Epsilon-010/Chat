@@ -10,7 +10,7 @@ const App = () => {
   }
 
   return (
-    <div className="flex h-screen w-full bg-lienar-to-br from-gray-900 to-gray-800 text-white">
+    <div className="flex h-screen w-full bg-gradient-to-br from-gray-900 to-gray-800 text-white">
       <Content username={user} />
     </div>
   );

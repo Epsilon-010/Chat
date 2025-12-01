@@ -1,12 +1,13 @@
 from fastapi import WebSocket
 from typing import List
+from src.crypto_utils import derive_key, encrypt_message, decrypt_message
 
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
-        await websocket.accept()
+        # await websocket.accept()
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
@@ -17,5 +18,7 @@ class ConnectionManager:
         for connection in self.active_connections:
             if connection != sender:
                 await connection.send_text(message)
+        
+    
 
 manager = ConnectionManager()
